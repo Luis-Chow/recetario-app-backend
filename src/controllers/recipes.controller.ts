@@ -57,14 +57,19 @@ export async function listRecipes(req: AuthRequest, res: Response) {
     filter.groupIds = groupId;
   }
 
-  const recipes = await Recipe.find(filter).collation(ES_COLLATION).sort({ title: 1 });
+  const recipes = await Recipe.find(filter)
+    .populate('userId', 'name avatar')
+    .collation(ES_COLLATION)
+    .sort({ title: 1 });
   return res.json({ recipes: recipes.map(serializeRecipe) });
 }
 
 export async function getRecipe(req: AuthRequest, res: Response) {
-  const recipe = await Recipe.findById(req.params.id);
+  const recipe = await Recipe.findById(req.params.id).populate('userId', 'name avatar');
   if (!recipe) return res.status(404).json({ error: 'Receta no encontrada.' });
-  if (!recipe.isPublic && recipe.userId.toString() !== req.userId) {
+  const ownerId = (recipe.userId as unknown as { _id?: { toString(): string } })._id
+    ?? recipe.userId;
+  if (!recipe.isPublic && ownerId.toString() !== req.userId) {
     return res.status(403).json({ error: 'No tienes acceso a esta receta.' });
   }
   return res.json({ recipe: serializeRecipe(recipe) });

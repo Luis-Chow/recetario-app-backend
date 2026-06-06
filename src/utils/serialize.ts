@@ -13,9 +13,17 @@ export function serializeUser(u: IUser) {
 }
 
 export function serializeRecipe(r: IRecipe) {
+  // Si el userId esta populated trae un objeto con name, sino solo el ObjectId
+  const populated = r.userId as unknown as { _id: { toString(): string }; name?: string; avatar?: string };
+  const isPopulated = populated && typeof populated === 'object' && 'name' in populated;
+  const userIdStr = isPopulated ? populated._id.toString() : (r.userId as { toString(): string }).toString();
+  const author = isPopulated
+    ? { id: userIdStr, name: populated.name || '', avatar: populated.avatar || '' }
+    : { id: userIdStr, name: '', avatar: '' };
   return {
     id: r._id.toString(),
-    userId: r.userId.toString(),
+    userId: userIdStr,
+    author,
     title: r.title,
     description: r.description,
     image: r.image ?? '',
