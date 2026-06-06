@@ -12,6 +12,8 @@ export interface IRecipe extends Document {
   title: string;
   description: string;
   image: string;
+  images: string[];
+  order: number;
   ingredients: IIngredient[];
   steps: string[];
   prepTime: number;
@@ -36,6 +38,8 @@ const RecipeSchema = new Schema<IRecipe>(
     title: { type: String, required: true, trim: true, maxlength: 80 },
     description: { type: String, default: '', maxlength: 1000 },
     image: { type: String, default: '' },
+    images: { type: [String], default: [] },
+    order: { type: Number, default: 0 },
     ingredients: { type: [IngredientSchema], default: [] },
     steps: { type: [{ type: String, maxlength: 500 }], default: [] },
     prepTime: { type: Number, default: 0, min: 0 },

@@ -60,7 +60,7 @@ export async function listRecipes(req: AuthRequest, res: Response) {
     const own = await Recipe.find({ userId })
       .populate('userId', 'name avatar')
       .collation(ES_COLLATION)
-      .sort({ title: 1 });
+      .sort({ order: 1, title: 1 });
 
     let savedRecipes: any[] = [];
     if (savedDocs.length > 0) {
@@ -79,7 +79,12 @@ export async function listRecipes(req: AuthRequest, res: Response) {
     });
 
     let combined = [...ownSerialized, ...savedSerialized]
-      .sort((a, b) => a.title.localeCompare(b.title, 'es', { sensitivity: 'base' }));
+      .sort((a, b) => {
+        const ao = a.order || 0;
+        const bo = b.order || 0;
+        if (ao !== bo) return ao - bo;
+        return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
+      });
 
     if (typeof groupId === 'string' && Types.ObjectId.isValid(groupId)) {
       combined = combined.filter(r => r.groupIds.includes(groupId));
@@ -120,6 +125,8 @@ export async function getRecipe(req: AuthRequest, res: Response) {
   return res.json({ recipe: out });
 }
 
+const MAX_EXTRA_IMAGES = 5;
+
 function validateImageString(raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
   if (raw === undefined || raw === null || raw === '') return { ok: true, value: '' };
   if (typeof raw !== 'string') return { ok: false, error: 'Imagen invalida.' };
@@ -128,9 +135,24 @@ function validateImageString(raw: unknown): { ok: true; value: string } | { ok: 
   return { ok: true, value: raw };
 }
 
+function validateImagesArray(raw: unknown): { ok: true; value: string[] } | { ok: false; error: string } {
+  if (raw === undefined) return { ok: true, value: [] };
+  if (!Array.isArray(raw)) return { ok: false, error: 'images debe ser un array.' };
+  if (raw.length > MAX_EXTRA_IMAGES) {
+    return { ok: false, error: `Maximo ${MAX_EXTRA_IMAGES} imagenes extra.` };
+  }
+  const out: string[] = [];
+  for (const img of raw) {
+    const check = validateImageString(img);
+    if (!check.ok) return { ok: false, error: check.error };
+    if (check.value) out.push(check.value);
+  }
+  return { ok: true, value: out };
+}
+
 export async function createRecipe(req: AuthRequest, res: Response) {
   const userId = req.userId!;
-  const { title, description, image, ingredients, steps, prepTime, servings, isPublic, groupIds } = req.body || {};
+  const { title, description, image, images, ingredients, steps, prepTime, servings, isPublic, groupIds } = req.body || {};
 
   if (typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: 'El titulo es obligatorio.' });
@@ -140,12 +162,15 @@ export async function createRecipe(req: AuthRequest, res: Response) {
   }
   const imgCheck = validateImageString(image);
   if (!imgCheck.ok) return res.status(400).json({ error: imgCheck.error });
+  const imagesCheck = validateImagesArray(images);
+  if (!imagesCheck.ok) return res.status(400).json({ error: imagesCheck.error });
 
   const recipe = await Recipe.create({
     userId,
     title: title.trim(),
     description: typeof description === 'string' ? description.slice(0, 1000) : '',
     image: imgCheck.value,
+    images: imagesCheck.value,
     ingredients: parseIngredients(ingredients),
     steps: parseSteps(steps),
     prepTime: clampInt(prepTime, 0, MAX_PREP_TIME, 0),
@@ -165,7 +190,7 @@ export async function updateRecipe(req: AuthRequest, res: Response) {
     return res.status(403).json({ error: 'No puedes editar una receta que no es tuya.' });
   }
 
-  const { title, description, image, ingredients, steps, prepTime, servings, isPublic, groupIds } = req.body || {};
+  const { title, description, image, images, ingredients, steps, prepTime, servings, isPublic, groupIds } = req.body || {};
 
   if (title !== undefined) {
     if (typeof title !== 'string' || !title.trim()) {
@@ -183,6 +208,11 @@ export async function updateRecipe(req: AuthRequest, res: Response) {
     const imgCheck = validateImageString(image);
     if (!imgCheck.ok) return res.status(400).json({ error: imgCheck.error });
     recipe.image = imgCheck.value;
+  }
+  if (images !== undefined) {
+    const imagesCheck = validateImagesArray(images);
+    if (!imagesCheck.ok) return res.status(400).json({ error: imagesCheck.error });
+    recipe.images = imagesCheck.value;
   }
   if (ingredients !== undefined) recipe.ingredients = parseIngredients(ingredients);
   if (steps !== undefined) recipe.steps = parseSteps(steps);
@@ -242,6 +272,26 @@ export async function saveRecipe(req: AuthRequest, res: Response) {
       groupIds: saved.groupIds.map(g => g.toString()),
     },
   });
+}
+
+export async function reorderRecipes(req: AuthRequest, res: Response) {
+  const userId = req.userId!;
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids)) {
+    return res.status(400).json({ error: 'Se esperaba un array "ids" con el orden.' });
+  }
+  const validIds = ids.filter(id => typeof id === 'string' && Types.ObjectId.isValid(id));
+  if (validIds.length === 0) {
+    return res.status(400).json({ error: 'Lista de ids vacia o invalida.' });
+  }
+  const owned = await Recipe.find({ userId, _id: { $in: validIds } }).select('_id');
+  const ownedSet = new Set(owned.map(r => r._id.toString()));
+  await Promise.all(
+    validIds
+      .filter(id => ownedSet.has(id))
+      .map((id, idx) => Recipe.updateOne({ _id: id, userId }, { order: idx + 1 }))
+  );
+  return res.json({ ok: true });
 }
 
 export async function unsaveRecipe(req: AuthRequest, res: Response) {

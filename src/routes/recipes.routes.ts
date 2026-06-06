@@ -8,6 +8,7 @@ import {
   deleteRecipe,
   saveRecipe,
   unsaveRecipe,
+  reorderRecipes,
 } from '../controllers/recipes.controller';
 
 const router = Router();
@@ -16,6 +17,9 @@ router.use(requireAuth);
 
 router.get('/', (req, res, next) => {
   listRecipes(req as AuthRequest, res).catch(next);
+});
+router.post('/reorder', (req, res, next) => {
+  reorderRecipes(req as AuthRequest, res).catch(next);
 });
 router.post('/', (req, res, next) => {
   createRecipe(req as AuthRequest, res).catch(next);

@@ -27,6 +27,8 @@ export function serializeRecipe(r: IRecipe) {
     title: r.title,
     description: r.description,
     image: r.image ?? '',
+    images: r.images ?? [],
+    order: r.order ?? 0,
     ingredients: r.ingredients.map(i => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
     steps: r.steps,
     prepTime: r.prepTime,
