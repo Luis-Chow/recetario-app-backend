@@ -34,6 +34,7 @@ export function serializeGroup(g: IGroup) {
     name: g.name,
     description: g.description,
     color: g.color,
+    order: g.order ?? 0,
     createdAt: g.createdAt.toISOString(),
   };
 }

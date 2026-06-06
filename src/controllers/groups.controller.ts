@@ -8,7 +8,31 @@ import { serializeGroup, serializeRecipe } from '../utils/serialize';
 const ES_COLLATION = { locale: 'es', strength: 2 } as const;
 
 export async function listGroups(req: AuthRequest, res: Response) {
-  const groups = await Group.find({ userId: req.userId }).collation(ES_COLLATION).sort({ name: 1 });
+  const groups = await Group.find({ userId: req.userId })
+    .collation(ES_COLLATION)
+    .sort({ order: 1, name: 1 });
+  return res.json({ groups: groups.map(serializeGroup) });
+}
+
+export async function reorderGroups(req: AuthRequest, res: Response) {
+  const { ids } = req.body || {};
+  if (!Array.isArray(ids)) {
+    return res.status(400).json({ error: 'Se esperaba un array "ids" con el orden.' });
+  }
+  const validIds = ids.filter(id => typeof id === 'string' && Types.ObjectId.isValid(id));
+  if (validIds.length === 0) {
+    return res.status(400).json({ error: 'Lista de ids vacia o invalida.' });
+  }
+  const owned = await Group.find({ userId: req.userId, _id: { $in: validIds } }).select('_id');
+  const ownedSet = new Set(owned.map(g => g._id.toString()));
+  await Promise.all(
+    validIds
+      .filter(id => ownedSet.has(id))
+      .map((id, idx) => Group.updateOne({ _id: id, userId: req.userId }, { order: idx + 1 }))
+  );
+  const groups = await Group.find({ userId: req.userId })
+    .collation(ES_COLLATION)
+    .sort({ order: 1, name: 1 });
   return res.json({ groups: groups.map(serializeGroup) });
 }
 

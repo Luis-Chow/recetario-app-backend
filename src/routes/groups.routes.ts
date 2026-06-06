@@ -6,6 +6,7 @@ import {
   createGroup,
   updateGroup,
   deleteGroup,
+  reorderGroups,
   addRecipeToGroup,
   removeRecipeFromGroup,
 } from '../controllers/groups.controller';
@@ -16,6 +17,9 @@ router.use(requireAuth);
 
 router.get('/', (req, res, next) => {
   listGroups(req as AuthRequest, res).catch(next);
+});
+router.post('/reorder', (req, res, next) => {
+  reorderGroups(req as AuthRequest, res).catch(next);
 });
 router.post('/', (req, res, next) => {
   createGroup(req as AuthRequest, res).catch(next);

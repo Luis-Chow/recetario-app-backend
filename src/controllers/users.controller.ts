@@ -16,7 +16,7 @@ export async function updateMe(req: AuthRequest, res: Response) {
   const user = await User.findById(req.userId);
   if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
 
-  const { name, email, password } = req.body || {};
+  const { name, email, password, currentPassword } = req.body || {};
 
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim()) {
@@ -44,6 +44,13 @@ export async function updateMe(req: AuthRequest, res: Response) {
   }
 
   if (password !== undefined) {
+    if (typeof currentPassword !== 'string' || !currentPassword) {
+      return res.status(400).json({ error: 'Debes ingresar tu contrasena actual para cambiarla.' });
+    }
+    const matches = await bcrypt.compare(currentPassword, user.password);
+    if (!matches) {
+      return res.status(401).json({ error: 'La contrasena actual no es correcta.' });
+    }
     if (typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({ error: 'La contrasena debe tener al menos 6 caracteres.' });
     }
@@ -52,6 +59,9 @@ export async function updateMe(req: AuthRequest, res: Response) {
     }
     if (/\s/.test(password)) {
       return res.status(400).json({ error: 'La contrasena no puede contener espacios.' });
+    }
+    if (currentPassword === password) {
+      return res.status(400).json({ error: 'La nueva contrasena debe ser distinta a la actual.' });
     }
     user.password = await bcrypt.hash(password, 10);
   }
