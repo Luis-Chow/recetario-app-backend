@@ -11,6 +11,15 @@ export function createApp() {
 
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
+  app.use((err: any, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err && err.type === 'entity.too.large') {
+      return res.status(413).json({ error: 'El payload es demasiado grande (max 10MB).' });
+    }
+    if (err && err.type === 'entity.parse.failed') {
+      return res.status(400).json({ error: 'JSON invalido.' });
+    }
+    next(err);
+  });
 
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, service: 'recetas-backend' });

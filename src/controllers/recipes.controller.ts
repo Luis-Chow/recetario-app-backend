@@ -8,8 +8,11 @@ import { serializeRecipe } from '../utils/serialize';
 
 const ES_COLLATION = { locale: 'es', strength: 2 } as const;
 
-const MAX_PREP_TIME = 1440; // 24 horas en minutos
+const MAX_PREP_TIME = 1440;
 const MAX_SERVINGS = 100;
+const MAX_INGREDIENTS = 50;
+const MAX_STEPS = 100;
+const CONTROL_CHARS = /[\x00-\x1F\x7F]/;
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = Math.round(Number(value));
@@ -17,9 +20,24 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   return Math.min(max, Math.max(min, n));
 }
 
+function validatePositiveInt(value: unknown, min: number, max: number, label: string)
+  : { ok: true; value: number } | { ok: false; error: string } {
+  if (value === undefined || value === null || value === '') {
+    return { ok: false, error: `${label} es obligatorio.` };
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    return { ok: false, error: `${label} debe ser un numero entero.` };
+  }
+  if (n < min) return { ok: false, error: `${label} debe ser >= ${min}.` };
+  if (n > max) return { ok: false, error: `${label} debe ser <= ${max}.` };
+  return { ok: true, value: n };
+}
+
 function parseIngredients(raw: unknown): { name: string; quantity: string; unit: string }[] {
   if (!Array.isArray(raw)) return [];
   return raw
+    .slice(0, MAX_INGREDIENTS)
     .filter(i => i && typeof i.name === 'string' && i.name.trim())
     .map(i => ({
       name: String(i.name).trim().slice(0, 60),
@@ -31,6 +49,7 @@ function parseIngredients(raw: unknown): { name: string; quantity: string; unit:
 function parseSteps(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw
+    .slice(0, MAX_STEPS)
     .filter(s => typeof s === 'string' && s.trim())
     .map(s => (s as string).slice(0, 500));
 }
@@ -129,10 +148,12 @@ export async function getRecipe(req: AuthRequest, res: Response) {
 
 const MAX_EXTRA_IMAGES = 5;
 
+const DATA_URI_IMAGE = /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/;
+
 function validateImageString(raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
   if (raw === undefined || raw === null || raw === '') return { ok: true, value: '' };
   if (typeof raw !== 'string') return { ok: false, error: 'Imagen invalida.' };
-  if (!raw.startsWith('data:image/')) return { ok: false, error: 'La imagen debe ser un data URI valido.' };
+  if (!DATA_URI_IMAGE.test(raw)) return { ok: false, error: 'La imagen debe ser un data URI valido (png/jpeg/gif/webp en base64).' };
   if (raw.length > 3_000_000) return { ok: false, error: 'La imagen es muy grande (max ~2MB).' };
   return { ok: true, value: raw };
 }
@@ -162,6 +183,13 @@ export async function createRecipe(req: AuthRequest, res: Response) {
   if (title.length > 80) {
     return res.status(400).json({ error: 'El titulo no puede superar 80 caracteres.' });
   }
+  if (CONTROL_CHARS.test(title)) {
+    return res.status(400).json({ error: 'El titulo contiene caracteres invalidos.' });
+  }
+  const prepCheck = validatePositiveInt(prepTime, 1, MAX_PREP_TIME, 'prepTime');
+  if (!prepCheck.ok) return res.status(400).json({ error: prepCheck.error });
+  const servCheck = validatePositiveInt(servings, 1, MAX_SERVINGS, 'servings');
+  if (!servCheck.ok) return res.status(400).json({ error: servCheck.error });
   const imgCheck = validateImageString(image);
   if (!imgCheck.ok) return res.status(400).json({ error: imgCheck.error });
   const imagesCheck = validateImagesArray(images);
@@ -175,8 +203,8 @@ export async function createRecipe(req: AuthRequest, res: Response) {
     images: imagesCheck.value,
     ingredients: parseIngredients(ingredients),
     steps: parseSteps(steps),
-    prepTime: clampInt(prepTime, 0, MAX_PREP_TIME, 0),
-    servings: clampInt(servings, 1, MAX_SERVINGS, 1),
+    prepTime: prepCheck.value,
+    servings: servCheck.value,
     isPublic: Boolean(isPublic),
     groupIds: await filterUserGroupIds(userId, groupIds),
   });
@@ -201,6 +229,9 @@ export async function updateRecipe(req: AuthRequest, res: Response) {
     if (title.length > 80) {
       return res.status(400).json({ error: 'El titulo no puede superar 80 caracteres.' });
     }
+    if (CONTROL_CHARS.test(title)) {
+      return res.status(400).json({ error: 'El titulo contiene caracteres invalidos.' });
+    }
     recipe.title = title.trim();
   }
   if (description !== undefined) {
@@ -219,10 +250,14 @@ export async function updateRecipe(req: AuthRequest, res: Response) {
   if (ingredients !== undefined) recipe.ingredients = parseIngredients(ingredients);
   if (steps !== undefined) recipe.steps = parseSteps(steps);
   if (prepTime !== undefined) {
-    recipe.prepTime = clampInt(prepTime, 0, MAX_PREP_TIME, 0);
+    const check = validatePositiveInt(prepTime, 1, MAX_PREP_TIME, 'prepTime');
+    if (!check.ok) return res.status(400).json({ error: check.error });
+    recipe.prepTime = check.value;
   }
   if (servings !== undefined) {
-    recipe.servings = clampInt(servings, 1, MAX_SERVINGS, 1);
+    const check = validatePositiveInt(servings, 1, MAX_SERVINGS, 'servings');
+    if (!check.ok) return res.status(400).json({ error: check.error });
+    recipe.servings = check.value;
   }
   if (isPublic !== undefined) recipe.isPublic = Boolean(isPublic);
   if (groupIds !== undefined) {

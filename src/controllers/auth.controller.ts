@@ -52,6 +52,9 @@ export async function login(req: Request, res: Response) {
   if (typeof email !== 'string' || typeof password !== 'string') {
     return res.status(400).json({ error: 'Correo y contrasena son obligatorios.' });
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Correo invalido.' });
+  }
 
   const user = await User.findOne({ email: email.toLowerCase().trim() });
   if (!user) {
