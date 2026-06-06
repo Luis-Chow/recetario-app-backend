@@ -16,7 +16,21 @@ export async function updateMe(req: AuthRequest, res: Response) {
   const user = await User.findById(req.userId);
   if (!user) return res.status(404).json({ error: 'Usuario no encontrado.' });
 
-  const { name, email, password, currentPassword } = req.body || {};
+  const { name, email, password, currentPassword, avatar } = req.body || {};
+
+  if (avatar !== undefined) {
+    if (avatar === null || avatar === '') {
+      user.avatar = '';
+    } else if (typeof avatar !== 'string') {
+      return res.status(400).json({ error: 'Avatar invalido.' });
+    } else if (!avatar.startsWith('data:image/')) {
+      return res.status(400).json({ error: 'El avatar debe ser un data URI valido.' });
+    } else if (avatar.length > 3_000_000) {
+      return res.status(400).json({ error: 'El avatar es muy grande (max ~2MB).' });
+    } else {
+      user.avatar = avatar;
+    }
+  }
 
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim()) {

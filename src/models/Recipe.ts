@@ -11,6 +11,7 @@ export interface IRecipe extends Document {
   userId: Types.ObjectId;
   title: string;
   description: string;
+  image: string;
   ingredients: IIngredient[];
   steps: string[];
   prepTime: number;
@@ -34,6 +35,7 @@ const RecipeSchema = new Schema<IRecipe>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     title: { type: String, required: true, trim: true, maxlength: 80 },
     description: { type: String, default: '', maxlength: 1000 },
+    image: { type: String, default: '' },
     ingredients: { type: [IngredientSchema], default: [] },
     steps: { type: [{ type: String, maxlength: 500 }], default: [] },
     prepTime: { type: Number, default: 0, min: 0 },

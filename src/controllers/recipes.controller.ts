@@ -70,9 +70,17 @@ export async function getRecipe(req: AuthRequest, res: Response) {
   return res.json({ recipe: serializeRecipe(recipe) });
 }
 
+function validateImageString(raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
+  if (raw === undefined || raw === null || raw === '') return { ok: true, value: '' };
+  if (typeof raw !== 'string') return { ok: false, error: 'Imagen invalida.' };
+  if (!raw.startsWith('data:image/')) return { ok: false, error: 'La imagen debe ser un data URI valido.' };
+  if (raw.length > 3_000_000) return { ok: false, error: 'La imagen es muy grande (max ~2MB).' };
+  return { ok: true, value: raw };
+}
+
 export async function createRecipe(req: AuthRequest, res: Response) {
   const userId = req.userId!;
-  const { title, description, ingredients, steps, prepTime, servings, isPublic, groupIds } = req.body || {};
+  const { title, description, image, ingredients, steps, prepTime, servings, isPublic, groupIds } = req.body || {};
 
   if (typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: 'El titulo es obligatorio.' });
@@ -80,11 +88,14 @@ export async function createRecipe(req: AuthRequest, res: Response) {
   if (title.length > 80) {
     return res.status(400).json({ error: 'El titulo no puede superar 80 caracteres.' });
   }
+  const imgCheck = validateImageString(image);
+  if (!imgCheck.ok) return res.status(400).json({ error: imgCheck.error });
 
   const recipe = await Recipe.create({
     userId,
     title: title.trim(),
     description: typeof description === 'string' ? description.slice(0, 1000) : '',
+    image: imgCheck.value,
     ingredients: parseIngredients(ingredients),
     steps: parseSteps(steps),
     prepTime: clampInt(prepTime, 0, MAX_PREP_TIME, 0),
@@ -104,7 +115,7 @@ export async function updateRecipe(req: AuthRequest, res: Response) {
     return res.status(403).json({ error: 'No puedes editar una receta que no es tuya.' });
   }
 
-  const { title, description, ingredients, steps, prepTime, servings, isPublic, groupIds } = req.body || {};
+  const { title, description, image, ingredients, steps, prepTime, servings, isPublic, groupIds } = req.body || {};
 
   if (title !== undefined) {
     if (typeof title !== 'string' || !title.trim()) {
@@ -117,6 +128,11 @@ export async function updateRecipe(req: AuthRequest, res: Response) {
   }
   if (description !== undefined) {
     recipe.description = typeof description === 'string' ? description.slice(0, 1000) : '';
+  }
+  if (image !== undefined) {
+    const imgCheck = validateImageString(image);
+    if (!imgCheck.ok) return res.status(400).json({ error: imgCheck.error });
+    recipe.image = imgCheck.value;
   }
   if (ingredients !== undefined) recipe.ingredients = parseIngredients(ingredients);
   if (steps !== undefined) recipe.steps = parseSteps(steps);

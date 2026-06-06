@@ -7,6 +7,7 @@ export function serializeUser(u: IUser) {
     id: u._id.toString(),
     name: u.name,
     email: u.email,
+    avatar: u.avatar ?? '',
     createdAt: u.createdAt.toISOString(),
   };
 }
@@ -17,6 +18,7 @@ export function serializeRecipe(r: IRecipe) {
     userId: r.userId.toString(),
     title: r.title,
     description: r.description,
+    image: r.image ?? '',
     ingredients: r.ingredients.map(i => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
     steps: r.steps,
     prepTime: r.prepTime,
