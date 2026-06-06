@@ -11,7 +11,6 @@ const ES_COLLATION = { locale: 'es', strength: 2 } as const;
 const MAX_PREP_TIME = 1440; // 24 horas en minutos
 const MAX_SERVINGS = 100;
 
-// Redondea a entero y recorta al rango [min, max]; usa fallback si no es numero.
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const n = Math.round(Number(value));
   if (!Number.isFinite(n)) return fallback;
@@ -56,7 +55,6 @@ export async function listRecipes(req: AuthRequest, res: Response) {
   }
 
   if (mine === 'true') {
-    // Mis Recetas: propias + guardadas
     const own = await Recipe.find({ userId })
       .populate('userId', 'name avatar')
       .collation(ES_COLLATION)
@@ -82,8 +80,12 @@ export async function listRecipes(req: AuthRequest, res: Response) {
       .sort((a, b) => {
         const ao = a.order || 0;
         const bo = b.order || 0;
-        if (ao !== bo) return ao - bo;
-        return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
+        if (ao === 0 && bo === 0) {
+          return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' });
+        }
+        if (ao === 0) return 1;
+        if (bo === 0) return -1;
+        return ao - bo;
       });
 
     if (typeof groupId === 'string' && Types.ObjectId.isValid(groupId)) {
