@@ -29,6 +29,11 @@ export async function createGroup(req: AuthRequest, res: Response) {
   if (name.length > 50) {
     return res.status(400).json({ error: 'El nombre no puede superar 50 caracteres.' });
   }
+  const duplicate = await Group.findOne({ userId: req.userId, name: name.trim() })
+    .collation(ES_COLLATION);
+  if (duplicate) {
+    return res.status(409).json({ error: 'Ya tienes un grupo con ese nombre.' });
+  }
   const group = await Group.create({
     userId: req.userId,
     name: name.trim(),
@@ -50,7 +55,18 @@ export async function updateGroup(req: AuthRequest, res: Response) {
     if (name.length > 50) {
       return res.status(400).json({ error: 'El nombre no puede superar 50 caracteres.' });
     }
-    group.name = name.trim();
+    const trimmed = name.trim();
+    if (trimmed.toLowerCase() !== group.name.toLowerCase()) {
+      const duplicate = await Group.findOne({
+        userId: req.userId,
+        _id: { $ne: group._id },
+        name: trimmed,
+      }).collation(ES_COLLATION);
+      if (duplicate) {
+        return res.status(409).json({ error: 'Ya tienes un grupo con ese nombre.' });
+      }
+    }
+    group.name = trimmed;
   }
   if (description !== undefined) {
     group.description = typeof description === 'string' ? description.slice(0, 1000) : '';
@@ -92,6 +108,8 @@ export async function removeRecipeFromGroup(req: AuthRequest, res: Response) {
   if (!Types.ObjectId.isValid(groupId) || !Types.ObjectId.isValid(recipeId)) {
     return res.status(400).json({ error: 'Identificador invalido.' });
   }
+  const group = await Group.findOne({ _id: groupId, userId: req.userId });
+  if (!group) return res.status(404).json({ error: 'Grupo no encontrado.' });
   const recipe = await Recipe.findOne({ _id: recipeId, userId: req.userId });
   if (!recipe) return res.status(404).json({ error: 'Receta no encontrada.' });
   recipe.groupIds = recipe.groupIds.filter(g => g.toString() !== groupId);

@@ -1,0 +1,542 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    "name": "RecetasApp API",
+    "description": "Coleccion completa de la API de RecetasApp. Incluye endpoints publicos (health, register, login) y autenticados (usuarios, recetas, grupos y relaciones receta-grupo). Las variables de coleccion (baseUrl, token, userId, recipeId, groupId) se rellenan automaticamente desde los scripts de test.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "description": "Endpoint publico de comprobacion de estado del servicio.",
+      "item": [
+        {
+          "name": "GET health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Comprueba que el backend esta vivo. Devuelve un objeto de estado simple."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Endpoints publicos de registro e inicio de sesion. Tras una respuesta exitosa, el token y el userId se guardan automaticamente como variables de coleccion.",
+      "item": [
+        {
+          "name": "POST register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  var data = pm.response.json();",
+                  "  if (data && data.token) {",
+                  "    pm.collectionVariables.set('token', data.token);",
+                  "  }",
+                  "  if (data && data.user && data.user.id) {",
+                  "    pm.collectionVariables.set('userId', data.user.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Luis Demo\",\n  \"email\": \"luis.demo@example.com\",\n  \"password\": \"Secret123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Crea una cuenta de usuario nueva. Devuelve token JWT y datos del usuario. El script de test guarda token y userId como variables de coleccion."
+          },
+          "response": []
+        },
+        {
+          "name": "POST login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  var data = pm.response.json();",
+                  "  if (data && data.token) {",
+                  "    pm.collectionVariables.set('token', data.token);",
+                  "  }",
+                  "  if (data && data.user && data.user.id) {",
+                  "    pm.collectionVariables.set('userId', data.user.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"luis.demo@example.com\",\n  \"password\": \"Secret123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Inicia sesion con email y contrasena. Devuelve token JWT y datos del usuario. El script de test guarda token y userId como variables de coleccion."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "Endpoints autenticados para gestionar la cuenta del usuario actual.",
+      "item": [
+        {
+          "name": "GET me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me"]
+            },
+            "description": "Devuelve los datos del usuario autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH me",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Luis Actualizado\",\n  \"email\": \"luis.actualizado@example.com\",\n  \"password\": \"NuevoSecret123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me"]
+            },
+            "description": "Actualiza parcialmente el usuario autenticado. Todos los campos son opcionales (name, email, password)."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE me",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "me"]
+            },
+            "description": "Elimina la cuenta del usuario autenticado. Despues de esto, el token quedara invalido."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Recipes",
+      "description": "CRUD de recetas del usuario autenticado. Soporta filtros por propias (mine=true) y por grupo (groupId).",
+      "item": [
+        {
+          "name": "GET recipes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recipes?mine=true&groupId={{groupId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "recipes"],
+              "query": [
+                {
+                  "key": "mine",
+                  "value": "true",
+                  "description": "Si es true, devuelve solo las recetas del usuario autenticado.",
+                  "disabled": true
+                },
+                {
+                  "key": "groupId",
+                  "value": "{{groupId}}",
+                  "description": "Filtra recetas que pertenezcan a este grupo.",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lista recetas accesibles para el usuario. Acepta los filtros opcionales mine=true y groupId=ID."
+          },
+          "response": []
+        },
+        {
+          "name": "POST recipe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  var data = pm.response.json();",
+                  "  if (data && data.recipe && data.recipe.id) {",
+                  "    pm.collectionVariables.set('recipeId', data.recipe.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tortilla de patatas\",\n  \"description\": \"Tortilla clasica espanola jugosa.\",\n  \"ingredients\": [\n    { \"name\": \"Patatas\", \"quantity\": 4, \"unit\": \"ud\" },\n    { \"name\": \"Huevos\", \"quantity\": 6, \"unit\": \"ud\" },\n    { \"name\": \"Cebolla\", \"quantity\": 1, \"unit\": \"ud\" },\n    { \"name\": \"Aceite de oliva\", \"quantity\": 200, \"unit\": \"ml\" },\n    { \"name\": \"Sal\", \"quantity\": 1, \"unit\": \"pizca\" }\n  ],\n  \"steps\": [\n    \"Pelar y cortar las patatas en laminas finas.\",\n    \"Freir las patatas con la cebolla a fuego medio hasta que esten tiernas.\",\n    \"Batir los huevos con sal y mezclar con las patatas escurridas.\",\n    \"Cuajar la tortilla en sarten por ambos lados.\"\n  ],\n  \"prepTime\": 45,\n  \"servings\": 4,\n  \"isPublic\": true,\n  \"groupIds\": [\"{{groupId}}\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/recipes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "recipes"]
+            },
+            "description": "Crea una nueva receta para el usuario autenticado. El script de test guarda el id devuelto en la variable recipeId."
+          },
+          "response": []
+        },
+        {
+          "name": "GET recipe by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recipes/{{recipeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "recipes", "{{recipeId}}"]
+            },
+            "description": "Devuelve la receta cuyo id coincide con recipeId."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH recipe",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tortilla de patatas con cebolla\",\n  \"description\": \"Version mejorada con mas cebolla pochada.\",\n  \"prepTime\": 50,\n  \"servings\": 4,\n  \"isPublic\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/recipes/{{recipeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "recipes", "{{recipeId}}"]
+            },
+            "description": "Actualiza parcialmente la receta. Solo se envian los campos a modificar."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE recipe",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/recipes/{{recipeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "recipes", "{{recipeId}}"]
+            },
+            "description": "Elimina la receta cuyo id coincide con recipeId."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Groups",
+      "description": "CRUD de grupos para organizar recetas.",
+      "item": [
+        {
+          "name": "GET groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/groups",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups"]
+            },
+            "description": "Lista los grupos del usuario autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "POST group",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                  "  var data = pm.response.json();",
+                  "  if (data && data.group && data.group.id) {",
+                  "    pm.collectionVariables.set('groupId', data.group.id);",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postres\",\n  \"description\": \"Recetas dulces para el final de la comida.\",\n  \"color\": \"#FF6B81\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/groups",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups"]
+            },
+            "description": "Crea un nuevo grupo. El script de test guarda el id devuelto en la variable groupId."
+          },
+          "response": []
+        },
+        {
+          "name": "GET group by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}"]
+            },
+            "description": "Devuelve el grupo cuyo id coincide con groupId."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH group",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postres caseros\",\n  \"description\": \"Recetas dulces faciles para casa.\",\n  \"color\": \"#FFA500\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}"]
+            },
+            "description": "Actualiza parcialmente el grupo. Solo se envian los campos a modificar."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}"]
+            },
+            "description": "Elimina el grupo cuyo id coincide con groupId. Las recetas asociadas NO se borran."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Group-Recipe relations",
+      "description": "Endpoints para asociar y desasociar recetas a grupos sin borrar la receta.",
+      "item": [
+        {
+          "name": "POST attach recipe to group",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}/recipes/{{recipeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}", "recipes", "{{recipeId}}"]
+            },
+            "description": "Asocia la receta recipeId al grupo groupId."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE detach recipe from group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/groups/{{groupId}}/recipes/{{recipeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "groups", "{{groupId}}", "recipes", "{{recipeId}}"]
+            },
+            "description": "Desasocia la receta recipeId del grupo groupId. La receta NO se elimina."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://recetario-app-backend-production.up.railway.app",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "recipeId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "groupId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
