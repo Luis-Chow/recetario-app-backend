@@ -106,14 +106,26 @@ export async function updateGroup(req: AuthRequest, res: Response) {
 export async function deleteGroup(req: AuthRequest, res: Response) {
   const group = await Group.findOne({ _id: req.params.id, userId: req.userId });
   if (!group) return res.status(404).json({ error: 'Grupo no encontrado.' });
-  // Borrar las recetas propias asociadas al grupo + sus saved-by-others
-  const ownedRecipes = await Recipe.find({ userId: req.userId, groupIds: group._id }).select('_id');
-  const ownedRecipeIds = ownedRecipes.map(r => r._id);
-  if (ownedRecipeIds.length > 0) {
-    await SavedRecipe.deleteMany({ recipeId: { $in: ownedRecipeIds } });
-    await Recipe.deleteMany({ _id: { $in: ownedRecipeIds } });
+
+  // ?keepRecipes=true preserva las recetas, solo las desasocia del grupo
+  const keepRecipes = req.query.keepRecipes === 'true';
+
+  if (keepRecipes) {
+    await Recipe.updateMany(
+      { userId: req.userId, groupIds: group._id },
+      { $pull: { groupIds: group._id } }
+    );
+  } else {
+    // Cascade: borrar las recetas propias del grupo + sus saved-by-others
+    const ownedRecipes = await Recipe.find({ userId: req.userId, groupIds: group._id }).select('_id');
+    const ownedRecipeIds = ownedRecipes.map(r => r._id);
+    if (ownedRecipeIds.length > 0) {
+      await SavedRecipe.deleteMany({ recipeId: { $in: ownedRecipeIds } });
+      await Recipe.deleteMany({ _id: { $in: ownedRecipeIds } });
+    }
   }
-  // Quitar la referencia al grupo de cualquier SavedRecipe del usuario
+
+  // En ambos casos: quitar la referencia al grupo de cualquier SavedRecipe del usuario
   await SavedRecipe.updateMany(
     { userId: req.userId, groupIds: group._id },
     { $pull: { groupIds: group._id } }
