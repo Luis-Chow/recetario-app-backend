@@ -4,3 +4,6 @@ dist/
 .env.local
 *.log
 .DS_Store
+
+# Datos temporales generados por el seed workflow
+scripts/.recipes-data.json
