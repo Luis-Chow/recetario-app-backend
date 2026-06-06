@@ -20,10 +20,10 @@ function clampInt(value: unknown, min: number, max: number, fallback: number): n
   return Math.min(max, Math.max(min, n));
 }
 
-function validatePositiveInt(value: unknown, min: number, max: number, label: string)
+function validatePositiveInt(value: unknown, min: number, max: number, label: string, fallback: number)
   : { ok: true; value: number } | { ok: false; error: string } {
   if (value === undefined || value === null || value === '') {
-    return { ok: false, error: `${label} es obligatorio.` };
+    return { ok: true, value: fallback };
   }
   const n = Number(value);
   if (!Number.isFinite(n) || !Number.isInteger(n)) {
@@ -186,9 +186,9 @@ export async function createRecipe(req: AuthRequest, res: Response) {
   if (CONTROL_CHARS.test(title)) {
     return res.status(400).json({ error: 'El titulo contiene caracteres invalidos.' });
   }
-  const prepCheck = validatePositiveInt(prepTime, 1, MAX_PREP_TIME, 'prepTime');
+  const prepCheck = validatePositiveInt(prepTime, 1, MAX_PREP_TIME, 'prepTime', 30);
   if (!prepCheck.ok) return res.status(400).json({ error: prepCheck.error });
-  const servCheck = validatePositiveInt(servings, 1, MAX_SERVINGS, 'servings');
+  const servCheck = validatePositiveInt(servings, 1, MAX_SERVINGS, 'servings', 1);
   if (!servCheck.ok) return res.status(400).json({ error: servCheck.error });
   const imgCheck = validateImageString(image);
   if (!imgCheck.ok) return res.status(400).json({ error: imgCheck.error });
@@ -250,12 +250,12 @@ export async function updateRecipe(req: AuthRequest, res: Response) {
   if (ingredients !== undefined) recipe.ingredients = parseIngredients(ingredients);
   if (steps !== undefined) recipe.steps = parseSteps(steps);
   if (prepTime !== undefined) {
-    const check = validatePositiveInt(prepTime, 1, MAX_PREP_TIME, 'prepTime');
+    const check = validatePositiveInt(prepTime, 1, MAX_PREP_TIME, 'prepTime', recipe.prepTime);
     if (!check.ok) return res.status(400).json({ error: check.error });
     recipe.prepTime = check.value;
   }
   if (servings !== undefined) {
-    const check = validatePositiveInt(servings, 1, MAX_SERVINGS, 'servings');
+    const check = validatePositiveInt(servings, 1, MAX_SERVINGS, 'servings', recipe.servings);
     if (!check.ok) return res.status(400).json({ error: check.error });
     recipe.servings = check.value;
   }
