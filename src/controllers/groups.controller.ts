@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { Types } from 'mongoose';
 import { Group } from '../models/Group';
 import { Recipe } from '../models/Recipe';
+import { SavedRecipe } from '../models/SavedRecipe';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { serializeGroup, serializeRecipe } from '../utils/serialize';
 
@@ -105,7 +106,18 @@ export async function updateGroup(req: AuthRequest, res: Response) {
 export async function deleteGroup(req: AuthRequest, res: Response) {
   const group = await Group.findOne({ _id: req.params.id, userId: req.userId });
   if (!group) return res.status(404).json({ error: 'Grupo no encontrado.' });
-  await Recipe.deleteMany({ userId: req.userId, groupIds: group._id });
+  // Borrar las recetas propias asociadas al grupo + sus saved-by-others
+  const ownedRecipes = await Recipe.find({ userId: req.userId, groupIds: group._id }).select('_id');
+  const ownedRecipeIds = ownedRecipes.map(r => r._id);
+  if (ownedRecipeIds.length > 0) {
+    await SavedRecipe.deleteMany({ recipeId: { $in: ownedRecipeIds } });
+    await Recipe.deleteMany({ _id: { $in: ownedRecipeIds } });
+  }
+  // Quitar la referencia al grupo de cualquier SavedRecipe del usuario
+  await SavedRecipe.updateMany(
+    { userId: req.userId, groupIds: group._id },
+    { $pull: { groupIds: group._id } }
+  );
   await group.deleteOne();
   return res.json({ ok: true });
 }

@@ -6,6 +6,8 @@ import {
   createRecipe,
   updateRecipe,
   deleteRecipe,
+  saveRecipe,
+  unsaveRecipe,
 } from '../controllers/recipes.controller';
 
 const router = Router();
@@ -26,6 +28,12 @@ router.patch('/:id', (req, res, next) => {
 });
 router.delete('/:id', (req, res, next) => {
   deleteRecipe(req as AuthRequest, res).catch(next);
+});
+router.post('/:id/save', (req, res, next) => {
+  saveRecipe(req as AuthRequest, res).catch(next);
+});
+router.delete('/:id/save', (req, res, next) => {
+  unsaveRecipe(req as AuthRequest, res).catch(next);
 });
 
 export default router;

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { User } from '../models/User';
 import { Recipe } from '../models/Recipe';
 import { Group } from '../models/Group';
+import { SavedRecipe } from '../models/SavedRecipe';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { serializeUser } from '../utils/serialize';
 
@@ -86,8 +87,24 @@ export async function updateMe(req: AuthRequest, res: Response) {
 
 export async function deleteMe(req: AuthRequest, res: Response) {
   const userId = req.userId!;
+  // Borrar las recetas del usuario y todas las "guardadas" que apuntaban a ellas
+  const recipesToDelete = await Recipe.find({ userId }).select('_id');
+  const recipeIds = recipesToDelete.map(r => r._id);
+  await SavedRecipe.deleteMany({ recipeId: { $in: recipeIds } });
   await Recipe.deleteMany({ userId });
+  // Borrar grupos del usuario y limpiar referencias en SavedRecipe ajenas
+  const groupsToDelete = await Group.find({ userId }).select('_id');
+  const groupIds = groupsToDelete.map(g => g._id);
   await Group.deleteMany({ userId });
+  // Limpiar grupos del usuario en cualquier SavedRecipe (las propias ya estan borradas)
+  if (groupIds.length > 0) {
+    await SavedRecipe.updateMany(
+      { groupIds: { $in: groupIds } },
+      { $pull: { groupIds: { $in: groupIds } } }
+    );
+  }
+  // Borrar las recetas guardadas POR este usuario
+  await SavedRecipe.deleteMany({ userId });
   await User.findByIdAndDelete(userId);
   return res.json({ ok: true });
 }

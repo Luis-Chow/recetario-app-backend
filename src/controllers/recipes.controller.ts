@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { Types } from 'mongoose';
 import { Recipe } from '../models/Recipe';
 import { Group } from '../models/Group';
+import { SavedRecipe } from '../models/SavedRecipe';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { serializeRecipe } from '../utils/serialize';
 
@@ -47,12 +48,49 @@ export async function listRecipes(req: AuthRequest, res: Response) {
   const userId = req.userId!;
   const { mine, groupId } = req.query;
 
-  const filter: Record<string, unknown> = {};
-  if (mine === 'true') {
-    filter.userId = userId;
-  } else {
-    filter.$or = [{ isPublic: true }, { userId }];
+  // Mapa de recetas guardadas por el usuario: recipeId -> savedGroupIds
+  const savedDocs = await SavedRecipe.find({ userId });
+  const savedMap = new Map<string, string[]>();
+  for (const s of savedDocs) {
+    savedMap.set(s.recipeId.toString(), s.groupIds.map(g => g.toString()));
   }
+
+  if (mine === 'true') {
+    // Mis Recetas: propias + guardadas
+    const own = await Recipe.find({ userId })
+      .populate('userId', 'name avatar')
+      .collation(ES_COLLATION)
+      .sort({ title: 1 });
+
+    let savedRecipes: any[] = [];
+    if (savedDocs.length > 0) {
+      const savedIds = savedDocs.map(s => s.recipeId);
+      savedRecipes = await Recipe.find({ _id: { $in: savedIds } })
+        .populate('userId', 'name avatar')
+        .collation(ES_COLLATION)
+        .sort({ title: 1 });
+    }
+
+    const ownSerialized = own.map(r => ({ ...serializeRecipe(r), isSaved: false }));
+    const savedSerialized = savedRecipes.map(r => {
+      const s = serializeRecipe(r);
+      const savedGroupIds = savedMap.get(s.id) || [];
+      return { ...s, groupIds: savedGroupIds, isSaved: true };
+    });
+
+    let combined = [...ownSerialized, ...savedSerialized]
+      .sort((a, b) => a.title.localeCompare(b.title, 'es', { sensitivity: 'base' }));
+
+    if (typeof groupId === 'string' && Types.ObjectId.isValid(groupId)) {
+      combined = combined.filter(r => r.groupIds.includes(groupId));
+    }
+    return res.json({ recipes: combined });
+  }
+
+  // Feed general: publicas + propias. Las guardadas no entran aqui automaticamente.
+  const filter: Record<string, unknown> = {
+    $or: [{ isPublic: true }, { userId }],
+  };
   if (typeof groupId === 'string' && Types.ObjectId.isValid(groupId)) {
     filter.groupIds = groupId;
   }
@@ -61,7 +99,9 @@ export async function listRecipes(req: AuthRequest, res: Response) {
     .populate('userId', 'name avatar')
     .collation(ES_COLLATION)
     .sort({ title: 1 });
-  return res.json({ recipes: recipes.map(serializeRecipe) });
+  return res.json({
+    recipes: recipes.map(r => ({ ...serializeRecipe(r), isSaved: savedMap.has(r._id.toString()) })),
+  });
 }
 
 export async function getRecipe(req: AuthRequest, res: Response) {
@@ -72,7 +112,12 @@ export async function getRecipe(req: AuthRequest, res: Response) {
   if (!recipe.isPublic && ownerId.toString() !== req.userId) {
     return res.status(403).json({ error: 'No tienes acceso a esta receta.' });
   }
-  return res.json({ recipe: serializeRecipe(recipe) });
+  const saved = await SavedRecipe.findOne({ userId: req.userId, recipeId: recipe._id });
+  const out = { ...serializeRecipe(recipe), isSaved: !!saved };
+  if (saved) {
+    out.groupIds = saved.groupIds.map(g => g.toString());
+  }
+  return res.json({ recipe: out });
 }
 
 function validateImageString(raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
@@ -162,6 +207,52 @@ export async function deleteRecipe(req: AuthRequest, res: Response) {
   if (recipe.userId.toString() !== req.userId) {
     return res.status(403).json({ error: 'No puedes borrar una receta que no es tuya.' });
   }
+  await SavedRecipe.deleteMany({ recipeId: recipe._id });
   await recipe.deleteOne();
+  return res.json({ ok: true });
+}
+
+export async function saveRecipe(req: AuthRequest, res: Response) {
+  const userId = req.userId!;
+  const recipeId = req.params.id;
+  if (!Types.ObjectId.isValid(recipeId)) {
+    return res.status(400).json({ error: 'Identificador invalido.' });
+  }
+  const recipe = await Recipe.findById(recipeId);
+  if (!recipe) return res.status(404).json({ error: 'Receta no encontrada.' });
+  if (recipe.userId.toString() === userId) {
+    return res.status(400).json({ error: 'No puedes guardar tu propia receta.' });
+  }
+  if (!recipe.isPublic) {
+    return res.status(403).json({ error: 'No puedes guardar una receta privada.' });
+  }
+
+  const validGroupIds = await filterUserGroupIds(userId, req.body?.groupIds);
+
+  const saved = await SavedRecipe.findOneAndUpdate(
+    { userId, recipeId: recipe._id },
+    { userId, recipeId: recipe._id, groupIds: validGroupIds },
+    { new: true, upsert: true }
+  );
+
+  return res.json({
+    saved: {
+      id: saved._id.toString(),
+      recipeId: saved.recipeId.toString(),
+      groupIds: saved.groupIds.map(g => g.toString()),
+    },
+  });
+}
+
+export async function unsaveRecipe(req: AuthRequest, res: Response) {
+  const userId = req.userId!;
+  const recipeId = req.params.id;
+  if (!Types.ObjectId.isValid(recipeId)) {
+    return res.status(400).json({ error: 'Identificador invalido.' });
+  }
+  const result = await SavedRecipe.deleteOne({ userId, recipeId });
+  if (result.deletedCount === 0) {
+    return res.status(404).json({ error: 'No tienes esta receta guardada.' });
+  }
   return res.json({ ok: true });
 }
