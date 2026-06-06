@@ -7,9 +7,9 @@ import fs from 'fs';
 
 const API = process.env.API || 'https://recetario-app-backend-production.up.railway.app/api';
 const DEMO = {
-  name: 'Chef Demo',
-  email: 'chefdemo@recetas.app',
-  password: 'chefdemo123',
+  name: process.env.SEED_NAME || 'Chef Demo',
+  email: process.env.SEED_EMAIL || 'chefdemo@recetas.app',
+  password: process.env.SEED_PASSWORD || 'chefdemo123',
 };
 
 const GROUP_DEFS = [
